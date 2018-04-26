@@ -1,0 +1,39 @@
+*&---------------------------------------------------------------------*
+*&  Include           ZAGTEST_PBO
+*&---------------------------------------------------------------------*
+
+MODULE status_0100 OUTPUT.
+
+  SET PF-STATUS 'ZAGTEST_100'.
+
+  IF g_custom_container IS INITIAL.
+    CREATE OBJECT g_custom_container
+      EXPORTING
+        container_name = 'CC_CONTAINER_GRID'.
+    CREATE OBJECT grid
+      EXPORTING
+        i_parent = g_custom_container.
+  ENDIF.
+
+  CALL METHOD grid->register_edit_event
+    EXPORTING
+      i_event_id = cl_gui_alv_grid=>mc_evt_modified.
+  CALL METHOD grid->register_edit_event
+    EXPORTING
+      i_event_id = cl_gui_alv_grid=>mc_evt_enter.
+
+  CREATE OBJECT event_receiver.
+  SET HANDLER event_receiver->handle_data_changed               FOR grid.
+  SET HANDLER event_receiver->handle_data_changed_finished      FOR grid.
+  SET HANDLER event_receiver->handle_double_click               FOR grid.
+  SET HANDLER event_receiver->handle_toolbar                    FOR grid.
+  SET HANDLER event_receiver->handle_user_command               FOR grid.
+  SET HANDLER event_receiver->handle_menu_button                FOR grid.
+  SET HANDLER event_receiver->handle_before_user_command        FOR grid.
+
+  CALL METHOD grid->set_toolbar_interactive( ).
+  CLEAR layout.
+  PERFORM show_grid_alv.
+  PERFORM enable_lock.
+
+ENDMODULE.

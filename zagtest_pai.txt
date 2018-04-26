@@ -1,0 +1,78 @@
+*&---------------------------------------------------------------------*
+*&  Include           ZAGTEST_PAI
+*&---------------------------------------------------------------------*
+MODULE user_command_0100 INPUT.
+  save_ok = ok_code.
+  CLEAR ok_code.
+
+* to react on custom events:
+  CALL METHOD cl_gui_cfw=>dispatch.
+  CASE save_ok.
+
+    WHEN 'SAVE'.
+
+      CALL METHOD grid->check_changed_data.
+      DATA: index TYPE sy-tabix.
+      DATA: wa_bkpfcp LIKE LINE OF gt_bkpfcp.
+      DATA: lt_bkpf_tmp TYPE STANDARD TABLE OF zagtest_bkpf.
+      DATA: wa_bkpf_tmp LIKE LINE OF gt_zbkpf.
+      DATA: wa_bkpf LIKE LINE OF gt_bkpf.
+      DATA: wa_zbkpf LIKE LINE OF gt_zbkpf.
+      CLEAR wa_bkpf.
+      CLEAR lt_bkpf_tmp.
+      LOOP AT gt_bkpf INTO wa_bkpf.
+        index = sy-tabix.
+        READ TABLE gt_bkpfcp INTO wa_bkpfcp INDEX index.
+        IF wa_bkpfcp-dmbtr NE wa_bkpf-dmbtr.
+
+          READ TABLE gt_zbkpf WITH KEY belnr = wa_bkpf-belnr
+                                       bukrs = wa_bkpf-bukrs
+                                       gjahr = wa_bkpf-gjahr
+                              INTO wa_zbkpf.
+          CASE sy-subrc.
+            WHEN 0.
+              IF wa_zbkpf-dmbtr NE wa_bkpf-dmbtr.
+                wa_zbkpf-dmbtr = wa_bkpf-dmbtr.
+                MODIFY zagtest_bkpf FROM wa_zbkpf.
+              ENDIF.
+            WHEN OTHERS.
+              MOVE-CORRESPONDING wa_bkpf TO wa_bkpf_tmp.
+              APPEND wa_bkpf_tmp TO lt_bkpf_tmp.
+          ENDCASE.
+        ENDIF.
+      ENDLOOP.
+      INSERT zagtest_bkpf FROM TABLE lt_bkpf_tmp.
+
+    WHEN 'PRINT'.
+      DATA: wa_gstruct LIKE LINE OF it_pdf.
+      LOOP AT gt_bkpf INTO wa_bkpf.
+        MOVE-CORRESPONDING wa_bkpf TO wa_gstruct.
+        APPEND wa_gstruct TO it_pdf.
+      ENDLOOP.
+
+      PERFORM pdf_show.
+  ENDCASE.
+ENDMODULE.
+
+
+*&---------------------------------------------------------------------*
+*&      Module  EXIT_COMMAND_0100  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE exit_command_0100 INPUT.
+  save_ok = ok_code.
+  CLEAR ok_code.
+
+  CASE save_ok.
+    WHEN 'BACK'.
+      LEAVE TO SCREEN 0.
+      PERFORM disable_lock.
+    WHEN 'EXIT'.
+      LEAVE PROGRAM.
+      PERFORM disable_lock.
+    WHEN 'CANCEL'.
+      LEAVE SCREEN.
+      PERFORM disable_lock.
+  ENDCASE.
+ENDMODULE.

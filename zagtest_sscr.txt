@@ -1,0 +1,7 @@
+*&---------------------------------------------------------------------*
+*&  Include           ZAGTEST_SSCR
+*&---------------------------------------------------------------------*
+
+  SELECT-OPTIONS p_gjahr FOR bkpf-gjahr.
+  SELECT-OPTIONS p_belnr FOR bkpf-belnr.
+  SELECT-OPTIONS p_bukrs FOR bkpf-bukrs.

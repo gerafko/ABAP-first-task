@@ -1,0 +1,237 @@
+*&---------------------------------------------------------------------*
+*&  Include           ZAGTEST_FORM
+*&---------------------------------------------------------------------*
+FORM load_data.
+  SELECT bkpf~mandt bkpf~bukrs bkpf~belnr bkpf~gjahr bkpf~blart bkpf~bldat bkpf~budat bkpf~monat bkpf~waers bseg~dmbtr bseg~wrbtr
+    FROM bkpf
+    INNER JOIN bseg
+      ON bkpf~gjahr = bseg~gjahr
+      AND bkpf~bukrs = bseg~bukrs
+      AND bkpf~belnr = bseg~belnr
+    INTO CORRESPONDING FIELDS OF TABLE gt_bkpf
+    WHERE bkpf~gjahr IN p_gjahr
+      AND bkpf~bukrs IN p_bukrs
+      AND bkpf~belnr IN p_belnr.
+  gt_bkpfcp[] = gt_bkpf[].
+
+  SELECT *
+  FROM zagtest_bkpf
+  INTO CORRESPONDING FIELDS OF TABLE gt_zbkpf.
+
+  PERFORM set_row_colour_blue.
+  PERFORM load_fcat.
+  PERFORM set_cell_colour_green.
+  PERFORM set_cell_edit.
+ENDFORM.
+
+FORM load_fcat.
+  CLEAR gt_fcat.
+  CLEAR gs_fcat.
+
+  gs_fcat-col_pos = 1.
+  gs_fcat-fieldname = 'checkbox'.
+  gs_fcat-seltext = 'Select'.
+  gs_fcat-checkbox = 'X'.
+  gs_fcat-edit = 'X'.
+  APPEND gs_fcat TO gt_fcat.
+
+  CLEAR gs_fcat.
+
+*  DEFINE add_fcat.
+*    clear gs_fcat.
+*    gs_fcat-col_pos = &1.
+*    gs_fcat-fieldname = &2.
+*    gs_fcat-ref_table = &3.
+*    gs_fcat-ref_field = &4.
+*    gs_fcat-outputlen = &5.
+*    APPEND gs_fcat TO gt_fcat.
+*  END-OF-DEFINITION.
+
+*  add_fcat:
+* 2  'MANDT' 'BKPF' 'MANDT'  5,
+* 3  'BUKRS' 'BKPF' 'BUKRS'  7,
+* 4  'BELNR' 'BKPF' 'BELNR' 10,
+* 5  'GJAHR' 'BKPF' 'GJAHR'  7,
+* 6  'BLART' 'BKPF' 'BLART'  7,
+* 7  'BLDAT' 'BKPF' 'BLDAT' 10,
+* 8  'BUDAT' 'BKPF' 'BUDAT' 10,
+* 9  'MONAT' 'BKPF' 'MONAT'  7,
+* 10 'CPUTM' 'BKPF' 'CPUTM'  8,
+* 11 'DMBTR' 'BSEG' 'DMBTR'  7,
+* 12 'WRBTR' 'BSEG' 'WRBTR'  7.
+
+ENDFORM.
+
+FORM set_cell_colour_green.
+  DATA: cellcolor TYPE lvc_s_scol.
+  DATA: index TYPE sy-tabix.
+  DATA: wa_bkpf LIKE LINE OF gt_bkpf.
+  LOOP AT gt_bkpf INTO wa_bkpf.
+    index = sy-tabix.
+
+    IF wa_bkpf-wrbtr GT 100.
+      cellcolor-fname = 'WRBTR'.
+      cellcolor-color-int = '1'.
+      cellcolor-color-inv = '1'.
+      cellcolor-color-col = '5'.
+      APPEND cellcolor TO wa_bkpf-t_cellcolor.
+      MODIFY gt_bkpf FROM wa_bkpf INDEX index TRANSPORTING t_cellcolor.
+    ENDIF.
+  ENDLOOP.
+ENDFORM.
+
+FORM set_cell_edit.
+  DATA: stylerow TYPE lvc_s_styl.
+  DATA: index TYPE sy-tabix.
+  DATA: wa_bkpf LIKE LINE OF gt_bkpf.
+
+  LOOP AT gt_bkpf INTO wa_bkpf.
+    index = sy-tabix.
+
+    IF wa_bkpf-dmbtr LT 100.
+      stylerow-fieldname = 'DMBTR'.
+      stylerow-style = cl_gui_alv_grid=>mc_style_enabled.
+
+      APPEND stylerow TO wa_bkpf-t_style.
+      MODIFY gt_bkpf FROM wa_bkpf INDEX index TRANSPORTING t_style.
+    ENDIF.
+  ENDLOOP.
+ENDFORM.
+
+FORM show_grid_alv.
+  variant-report = sy-repid.
+  CALL METHOD grid->set_ready_for_input
+    EXPORTING
+      i_ready_for_input = 1.
+
+  layout-ctab_fname = 't_cellcolor'.
+  layout-stylefname = 't_style'.
+  layout-box_fname = 'w_bkpf-checkbox'.
+  layout-info_fname = 'row_color'.
+
+  CALL METHOD grid->set_table_for_first_display
+    EXPORTING
+      i_save           = 'A'
+      is_variant       = variant
+      is_layout        = layout
+      i_structure_name = 'ZAGTEST_GSTRUCT'
+    CHANGING
+      it_outtab        = gt_bkpf
+      it_fieldcatalog  = gt_fcat.
+ENDFORM.
+
+FORM set_row_colour_blue.
+  DATA: wa_bkpf LIKE LINE OF gt_bkpf.
+  DATA: wa_zbkpf LIKE LINE OF gt_zbkpf.
+  DATA: index TYPE sy-tabix.
+  LOOP AT gt_bkpf INTO wa_bkpf.
+    index = sy-tabix.
+
+
+    READ TABLE gt_zbkpf WITH KEY belnr = wa_bkpf-belnr
+                                 bukrs = wa_bkpf-bukrs
+                                 gjahr = wa_bkpf-gjahr
+                        INTO wa_zbkpf.
+    CASE sy-subrc.
+      WHEN 0.
+        wa_bkpf-row_color = 'C111'.
+        wa_bkpf-dmbtr = wa_zbkpf-dmbtr.
+        MODIFY gt_bkpf FROM wa_bkpf INDEX index.
+    ENDCASE.
+  ENDLOOP.
+ENDFORM.
+
+FORM enable_lock.
+  CALL FUNCTION 'ENQUEUE_EZ_ZAGTEST'
+    EXPORTING
+      mode_zagtest_bkpf = 'E'
+    EXCEPTIONS
+      foreign_lock      = 1
+      system_failure    = 2
+      OTHERS            = 3.
+ENDFORM.
+
+FORM disable_lock.
+  CALL FUNCTION 'DEQUEUE_EZ_ZAGTEST'
+    EXPORTING
+      mode_zagtest_bkpf = 'E'.
+ENDFORM.
+
+FORM pdf_show.
+  DATA: fm_name TYPE rs38l_fnam.
+  DATA: outputparams   TYPE sfpoutputparams.
+  DATA: docparams      TYPE sfpdocparams.
+
+  TRY.
+
+      CALL FUNCTION 'FP_FUNCTION_MODULE_NAME'
+        EXPORTING
+          i_name         = 'ZAG_FORM'
+        IMPORTING
+          e_funcname     = fm_name
+        EXCEPTIONS
+          usage_error    = 1
+          system_error   = 2
+          internal_error = 3
+          OTHERS         = 4.
+
+    CATCH cx_root.
+*      MESSAGE e004 WITH 'zag_form'.
+  ENDTRY.
+
+  IF sy-subrc <> 0.
+*  <error handling>
+  ENDIF.
+  BREAK-POINT.
+
+  outputparams-nodialog = space.
+  outputparams-preview = 'X'.
+
+  CALL FUNCTION 'FP_JOB_OPEN'
+    CHANGING
+      ie_outputparams = outputparams
+    EXCEPTIONS
+      cancel          = 1
+      usage_error     = 2
+      system_error    = 3
+      internal_error  = 4
+      OTHERS          = 5.
+  IF sy-subrc <> 0.
+*            <error handling>
+  ENDIF.
+  BREAK-POINT.
+
+  CALL FUNCTION fm_name
+   EXPORTING
+     /1BCDWB/DOCPARAMS        = docparams
+     P_GJAHR                  =
+     P_BUKRS                  =
+     P_BELNR                  =
+     IT_TAB                   = it_pdf
+*   IMPORTING
+*     /1BCDWB/FORMOUTPUT       =
+*   EXCEPTIONS
+*     USAGE_ERROR              = 1
+*     SYSTEM_ERROR             = 2
+*     INTERNAL_ERROR           = 3
+*     OTHERS                   = 4
+            .
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+  IF sy-subrc <> 0.
+*  <error handling>
+  ENDIF.
+  BREAK-POINT.
+  CALL FUNCTION 'FP_JOB_CLOSE'
+    EXCEPTIONS
+      usage_error    = 1
+      system_error   = 2
+      internal_error = 3
+      OTHERS         = 4.
+  IF sy-subrc <> 0.
+*            <error handling>
+  ENDIF.
+  BREAK-POINT.
+ENDFORM.

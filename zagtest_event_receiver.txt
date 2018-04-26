@@ -1,0 +1,183 @@
+*&---------------------------------------------------------------------*
+*&  Include           ZAGTEST_EVENT_RECEIVER
+*&---------------------------------------------------------------------*
+CLASS lcl_event_receiver DEFINITION.
+
+  PUBLIC SECTION.
+
+    METHODS:
+
+      handle_data_changed
+                    FOR EVENT data_changed OF cl_gui_alv_grid
+        IMPORTING er_data_changed e_ucomm,
+
+      handle_data_changed_finished
+                    FOR EVENT data_changed_finished OF cl_gui_alv_grid
+        IMPORTING e_modified et_good_cells,
+
+      handle_double_click
+            FOR EVENT double_click OF cl_gui_alv_grid
+        IMPORTING
+            e_row
+            e_column
+            es_row_no,
+
+      handle_toolbar                      " TOOLBAR
+            FOR EVENT toolbar OF cl_gui_alv_grid
+        IMPORTING
+            e_object
+            e_interactive,
+
+      handle_user_command
+                    FOR EVENT user_command OF cl_gui_alv_grid
+        IMPORTING e_ucomm,
+
+      handle_menu_button                  " MENU_BUTTON
+            FOR EVENT menu_button OF cl_gui_alv_grid
+        IMPORTING
+            e_object
+            e_ucomm,
+
+      handle_before_user_command
+                    FOR EVENT before_user_command OF cl_gui_alv_grid
+        IMPORTING e_ucomm.
+
+*      on_toolbar_click_data
+*      FOR EVENT user_command
+*                    OF cl_gui_alv_grid
+*        IMPORTING e_ucomm.
+
+
+ENDCLASS.                    "lcl_event_receiver DEFINITION
+
+*---------------------------------------------------------------------*
+CLASS lcl_event_receiver IMPLEMENTATION.
+
+  METHOD handle_data_changed.
+    DATA:
+      itab   TYPE lvc_t_modi,  "Измененные ячейки
+      s_line TYPE lvc_s_modi.
+
+    itab[] = er_data_changed->mt_mod_cells[].
+    LOOP AT itab INTO s_line.
+      IF s_line-error = 'X'.
+        CLEAR er_data_changed->mt_mod_cells[].   "Отмена изменений
+        EXIT.
+      ENDIF.
+    ENDLOOP.
+  ENDMETHOD.                    "handle_data_changed
+
+  METHOD handle_data_changed_finished.
+    DATA:
+      ins_lines_c TYPE i.
+
+    ins_lines_c = lines( et_good_cells ).
+  ENDMETHOD.                    "handle_DATA_CHANGED_FINISHED
+
+  METHOD handle_double_click.
+    DATA: params LIKE LINE OF gt_bkpf."TYPE parametrs_for_fb03.
+    READ TABLE gt_bkpf INTO params INDEX e_row.
+    SET PARAMETER ID 'BLN' FIELD params-belnr.
+    SET PARAMETER ID 'BUK' FIELD params-bukrs.
+    SET PARAMETER ID 'GJR' FIELD params-gjahr.
+    CALL TRANSACTION 'FB03' AND SKIP FIRST SCREEN.
+    BREAK-POINT.
+  ENDMETHOD.                    "handle_double_click
+
+  METHOD handle_toolbar.
+    DATA: ls_toolbar TYPE stb_button.
+    CLEAR ls_toolbar.
+    ls_toolbar-butn_type = 3.
+    APPEND ls_toolbar TO e_object->mt_toolbar.
+    CLEAR ls_toolbar.
+    ls_toolbar-function = 'RESH'.
+    ls_toolbar-icon = icon_refresh.
+    ls_toolbar-quickinfo = 'Обновить'.
+    ls_toolbar-text = ''.
+    MODIFY e_object->mt_toolbar INDEX '3' FROM ls_toolbar.
+
+    CLEAR ls_toolbar.
+    ls_toolbar-butn_type = 3.
+    APPEND ls_toolbar TO e_object->mt_toolbar.
+    CLEAR ls_toolbar.
+    ls_toolbar-function = 'DELR'.
+    ls_toolbar-icon = icon_delete_row.
+    ls_toolbar-quickinfo = 'Удалить строку'.
+    ls_toolbar-text = ''.
+    MODIFY e_object->mt_toolbar INDEX '12' FROM ls_toolbar.
+  ENDMETHOD.                    "handle_toolbar
+
+  METHOD handle_user_command.
+    CASE e_ucomm.
+      WHEN 'RESH'.
+        PERFORM load_data.
+        PERFORM show_grid_alv.
+      WHEN 'DELR'.
+        DATA: l_lines TYPE i.
+        DATA: ld_index_rows TYPE lvc_t_row.
+        DATA: selected_row LIKE LINE OF ld_index_rows.
+
+        CALL METHOD grid->get_selected_rows(
+          IMPORTING
+            et_index_rows = ld_index_rows ).
+        DESCRIBE TABLE ld_index_rows LINES l_lines.
+        IF l_lines <> 0.
+*----------------------------------------
+          DATA: ld_answer TYPE string.
+          CALL FUNCTION 'POPUP_TO_CONFIRM'
+            EXPORTING
+              titlebar              = 'Удаление'
+*             DIAGNOSE_OBJECT       = ' '
+              text_question         = 'Вы действительно хотите удалить строки?'
+              text_button_1         = 'Да'(001)
+*             icon_button_1         = ' '
+              text_button_2         = 'Нет'(002)
+*             ICON_BUTTON_2         = ' '
+*             default_button        = '1'
+              display_cancel_button = 'X'
+*             userdefined_f1_help   = ' '
+*             START_COLUMN          = 25
+*             START_ROW             = 6
+*             POPUP_TYPE            =
+*             IV_QUICKINFO_BUTTON_1 = ' '
+*             IV_QUICKINFO_BUTTON_2 = ' '
+            IMPORTING
+              answer                = ld_answer
+*             TABLES
+*             PARAMETER             =
+            EXCEPTIONS
+              text_not_found        = 1
+              OTHERS                = 2.
+*---------------------------------------------
+          IF ld_answer EQ '1'.
+            WHILE l_lines <> 0.
+              READ TABLE ld_index_rows INTO selected_row INDEX l_lines.
+              DELETE gt_bkpf INDEX selected_row-index.
+              l_lines = l_lines - 1.
+            ENDWHILE.
+            PERFORM show_grid_alv.
+            gt_bkpfcp[] = gt_bkpf[].
+          ENDIF.
+        ENDIF.
+    ENDCASE.
+  ENDMETHOD.
+
+  METHOD handle_menu_button.
+    BREAK-POINT.
+  ENDMETHOD.                    "handle_menu_button
+
+  METHOD handle_before_user_command.
+  ENDMETHOD.
+
+*  METHOD on_toolbar_click_data.
+*
+*    CASE e_ucomm.
+*      WHEN 'ADD'.
+*        BREAK-POINT.
+*      WHEN 'DEL'.
+*        BREAK-POINT.
+*    ENDCASE.
+*
+*  ENDMETHOD.
+
+ENDCLASS.

@@ -1,0 +1,17 @@
+REPORT zagtest.
+
+INCLUDE zagtest_data.
+INCLUDE zagtest_event_receiver.
+INCLUDE zagtest_sscr.
+INCLUDE zagtest_form.
+INCLUDE zagtest_pbo.
+INCLUDE zagtest_pai.
+
+START-OF-SELECTION.
+  PERFORM load_data.
+  PERFORM load_fcat.
+  PERFORM set_cell_colour_green.
+  PERFORM set_cell_edit.
+
+
+  CALL SCREEN 0100.
